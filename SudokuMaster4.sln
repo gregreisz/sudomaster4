@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28010.2016
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SudokuMaster4", "SudokuMaster4.csproj", "{19096FB4-FF22-4922-BC77-7E24263A897B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{19096FB4-FF22-4922-BC77-7E24263A897B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{19096FB4-FF22-4922-BC77-7E24263A897B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{19096FB4-FF22-4922-BC77-7E24263A897B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{19096FB4-FF22-4922-BC77-7E24263A897B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {03A6020B-D230-4960-B174-A80986455377}
+	EndGlobalSection
+EndGlobal
