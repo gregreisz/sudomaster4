@@ -18,6 +18,8 @@ namespace SudokuMaster4
         public readonly int CellWidth = 64;
         public readonly int CellHeight = 64;
 
+        public int SelectedNumber = 0;
+
         // offset from the top left corner of the window   
         public readonly int XOffset = -40;
         public readonly int YOffset = -4;
@@ -34,14 +36,11 @@ namespace SudokuMaster4
         public string SaveFileName = string.Empty;
 
         //  the number currently selected for insertion  
-        public int SelectedNumber;
         // has the game started?  
         public bool GameStarted;
 
         //  used to keep track of elapsed time  
         public int Seconds;
-
-
 
         #endregion
 
@@ -62,7 +61,7 @@ namespace SudokuMaster4
 
         public void DrawBoard()
         {
-            SelectedNumber = 1;
+            if (tableLayoutPanel1.Controls.Count >= 81) throw new Exception("The board has already been drawn.");
 
             // used to store the location of the cell 
             var location = new Point();
@@ -93,7 +92,8 @@ namespace SudokuMaster4
                         Row = row,
                         SubGrid = SudokuPuzzle.GetRegion(col, row)
                     };
-                    tableLayoutPanel1.Controls.Add(label);
+
+                    if (tableLayoutPanel1.Controls.Count < 81) tableLayoutPanel1.Controls.Add(label);
                 }
             }
         }
@@ -105,7 +105,6 @@ namespace SudokuMaster4
             GameStarted = true;
             timer1.Enabled = true;
             ButtonNotes.Visible = true;
-            ButtonSolvePuzzle.Visible = true;
             toolStripStatusLabel1.Text = @"New game started";
             toolTip1.RemoveAll();
         }
@@ -132,8 +131,6 @@ namespace SudokuMaster4
                 Trace.WriteLine(typeof(Exception).ToString());
             }
 
-            var watch3 = new Stopwatch();
-
             // load the game from disk 
             var filter = @"SS files (easy1.ss)|easy1.ss|SDO files (*.sdo)|*.sdo|All files (*.*)|*.*";
             var dialog = new OpenFileDialog
@@ -143,14 +140,8 @@ namespace SudokuMaster4
                 RestoreDirectory = false
             };
 
-            watch3.Stop();
-            var elapsedMs3 = watch3.ElapsedMilliseconds;
-            Trace.WriteLine($"It took {elapsedMs3} milliseconds to open OpenFileDialog box.");
-
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                var watch1 = Stopwatch.StartNew();
-
                 FileContent = File.ReadAllText(dialog.FileName).Replace("X", "0").Replace("\r", "").Replace("\n", "");
                 if (FileContent.Length != 81)
                 {
@@ -160,9 +151,6 @@ namespace SudokuMaster4
                 Text = dialog.FileName;
                 SaveFileName = dialog.FileName;
 
-                watch1.Stop();
-                var elapsedMs1 = watch1.ElapsedMilliseconds;
-                Trace.WriteLine($"It took {elapsedMs1} milliseconds to read in file content.");
             }
             else
             {
@@ -173,8 +161,6 @@ namespace SudokuMaster4
             StartNewGame();
 
             // initialize the board 
-            var watch2 = Stopwatch.StartNew();
-
             var counter = 0;
             foreach (var row in Enumerable.Range(1, 9))
             {
@@ -185,10 +171,6 @@ namespace SudokuMaster4
                     SetCell(col, row, value);
                 }
             }
-
-            watch2.Stop();
-            var elapsedMs2 = watch2.ElapsedMilliseconds;
-            Trace.WriteLine($"It took {elapsedMs2} milliseconds to initialize the board.");
 
             DisplayCandidatesForAllCells();
 
@@ -276,7 +258,7 @@ namespace SudokuMaster4
             extremelyDifficultMenuItem.Checked = false;
         }
 
-        private static void OnMenuItemClick(object sender, EventArgs e)
+        private void OnMenuItemClick(object sender, EventArgs e)
         {
             if (sender is MenuItem item)
             {
@@ -285,9 +267,28 @@ namespace SudokuMaster4
                     var label = (SudokuLabel)owner.SourceControl;
                     Trace.WriteLine(label.Name);
                     label.Font = new Font("Consolas", 12);
-                    label.Text = item.Text.Substring(5);
-                    label.Value = int.Parse(label.Text);
+                    if (item.Text.Contains("Exclude")) label.Text = item.Text.Substring(7);
+                    if (item.Text.Contains("Make")) label.Text = item.Text.Substring(5);
+                    SelectedNumber = label.Value = int.Parse(label.Text);
+
+                    //todo: Create IsMoveValid function.
+                    // check if move is valid
+                    if (!new SudokuPuzzle().IsMoveValid(label.Column, label.Row, label.Value))
+                    {
+                        new SudokuPuzzle().DisplayActivity($"Invalid move at ({label.Column},{label.Row})", false);
+                        return;
+                    }
+
+                    //todo: Create IsPuzzleSolved function.
+                    if (new SudokuPuzzle().IsPuzzleSolved())
+                    {
+                        timer1.Enabled = false;
+                        Console.Beep();
+                        toolStripStatusLabel1.Text = @"*****Puzzle Solved*****";
+                    }
+
                     label.Enabled = false;
+                    DisplayCandidatesForAllCells();
                 }
             }
         }
@@ -306,7 +307,6 @@ namespace SudokuMaster4
 
             if (!label.IsGiven)
             {
-                Trace.WriteLine(label.Candidates);
                 var candidates = label.Candidates.Replace(" ", "").Replace("\r\n", "");
                 var cm = new ContextMenu();
                 cm.MenuItems.Clear();
@@ -333,60 +333,6 @@ namespace SudokuMaster4
                 }
                 label.ContextMenu = cm;
             }
-            else
-            {
-                return;
-            }
-
-            //todo: Create IsMoveValid function.
-            // check if move is valid 
-            //if (!sp.IsMoveValid(col, row, SelectedNumber))
-            //{
-            //    sp.DisplayActivity($"Invalid move at ({col},{row})", false);
-            //    return;
-            //}
-
-            //todo: Create IsPuzzleSolved function.
-            if (new SudokuPuzzle().IsPuzzleSolved())
-            {
-                timer1.Enabled = false;
-                Console.Beep();
-                toolStripStatusLabel1.Text = @"*****Puzzle Solved*****";
-            }
-
-
-        }
-
-        private void SaveToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            var sp = new SudokuPuzzle();
-            if (!GameStarted)
-            {
-                sp.DisplayActivity("Game not started yet.", true);
-                return;
-            }
-
-            sp.SaveGameToDisk(false);
-        }
-
-        private void SaveAsToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            if (!GameStarted)
-            {
-                new SudokuPuzzle().DisplayActivity("Game not started yet.", true);
-                return;
-            }
-
-            new SudokuPuzzle().SaveGameToDisk(true);
-        }
-
-        private void RedoToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-        }
-
-        private void UndoToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-
         }
 
         private void Timer1_Tick(object sender, EventArgs e)
@@ -435,6 +381,7 @@ namespace SudokuMaster4
         {
             if (GameStarted)
             {
+                Visible = false;
                 var dr = ShowDialog();
                 MessageBox.Show(@"Do you want to save current game?");
 
@@ -455,6 +402,33 @@ namespace SudokuMaster4
         private void ButtonClearTextBox_Click(object sender, EventArgs e)
         {
 
+        }
+
+        private void UndoToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void RedoToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void SaveAsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (!GameStarted)
+            {
+                new SudokuPuzzle().DisplayActivity("Game not started yet.", true);
+                return;
+            }
+
+            new SudokuPuzzle().SaveGameToDisk(true);
+        }
+
+        private void CreatePuzzleToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            var form = new PuzzleCreator();
+            form.Show();
         }
     }
 }
