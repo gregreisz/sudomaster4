@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 using System.Windows.Forms;
 using ContentAlignment = System.Drawing.ContentAlignment;
 
@@ -10,39 +11,40 @@ namespace SudokuMaster4
 {
     public partial class Form1
     {
-        #region Class Level Variables
-
         public string FileContent { get; set; }
 
         // dimension of each cell in the grid   
         public readonly int CellWidth = 64;
         public readonly int CellHeight = 64;
 
-        public int SelectedNumber = 0;
+        public int SelectedNumber;
+
+        public Stack<string> Moves = new Stack<string>();
+        public Stack<string> RedoMoves = new Stack<string>();
+
+        public static List<SudokuLabel> sudokuLabels = new List<SudokuLabel>();
+
+        public static string InitialDirectory = @"C:\Users\greg\OneDrive\Projects\SudokuMaster4\Games\";
 
         // offset from the top left corner of the window   
         public readonly int XOffset = -40;
         public readonly int YOffset = -4;
 
         //  color for original puzzle values  
-        public readonly Color FixedBackColor = Color.LightSteelBlue;
-        public readonly Color FixedForeColor = Color.SteelBlue;
-        public readonly Color UserBackColor = Color.LightYellow;
+        public readonly Color UserBackColor = Color.White;
         public readonly Color UserForeColor = Color.Black;
 
         public bool ShowHints { get; set; } = true;
 
         //  keep track of file name to save to  
-        public string SaveFileName = string.Empty;
+        public static string SaveFileName = string.Empty;
 
-        //  the number currently selected for insertion  
-        // has the game started?  
+        //  the number currently selected for insertion has the game started?  
         public bool GameStarted;
+
 
         //  used to keep track of elapsed time  
         public int Seconds;
-
-        #endregion
 
         public Form1()
         {
@@ -61,7 +63,7 @@ namespace SudokuMaster4
 
         public void DrawBoard()
         {
-            if (tableLayoutPanel1.Controls.Count >= 81) throw new Exception("The board has already been drawn.");
+            //if (tableLayoutPanel1.Controls.Count >= 81) throw new Exception("The board has already been drawn.");
 
             // used to store the location of the cell 
             var location = new Point();
@@ -73,7 +75,7 @@ namespace SudokuMaster4
                     location.X = col * (CellWidth + 1) + XOffset - 8;
                     location.Y = row * (CellHeight + 1) + YOffset - 28;
                     var subgrid = SudokuPuzzle.GetRegion(col, row);
-                    var label = new SudokuLabel
+                    var sudokuLabel = new SudokuLabel
                     {
                         Name = $"Label{col}{row}{subgrid}",
                         Tag = $"Label{col}{row}{subgrid}",
@@ -92,8 +94,9 @@ namespace SudokuMaster4
                         Row = row,
                         SubGrid = SudokuPuzzle.GetRegion(col, row)
                     };
-
-                    if (tableLayoutPanel1.Controls.Count < 81) tableLayoutPanel1.Controls.Add(label);
+                    SudokuPuzzle.SetAlternateRegionColors(ref sudokuLabel);
+                    sudokuLabels.Add(sudokuLabel);
+                    if (tableLayoutPanel1.Controls.Count < 81) tableLayoutPanel1.Controls.Add(sudokuLabel);
                 }
             }
         }
@@ -118,7 +121,7 @@ namespace SudokuMaster4
                     var dr = ShowDialog();
                     if (dr == DialogResult.OK)
                     {
-                        new SudokuPuzzle().SaveGameToDisk(false);
+                        SudokuPuzzle.SaveGameToDisk(false);
                     }
                     else if (dr == DialogResult.Cancel)
                     {
@@ -132,17 +135,18 @@ namespace SudokuMaster4
             }
 
             // load the game from disk 
-            var filter = @"SS files (easy1.ss)|easy1.ss|SDO files (*.sdo)|*.sdo|All files (*.*)|*.*";
+            var filter = @"SS files (*.ss)|*.ss|SDO files (*.sdo)|*.sdo|All files (*.*)|*.*";
             var dialog = new OpenFileDialog
             {
                 Filter = filter,
                 FilterIndex = 1,
+                InitialDirectory = InitialDirectory,
                 RestoreDirectory = false
             };
 
             if (dialog.ShowDialog() == DialogResult.OK)
             {
-                FileContent = File.ReadAllText(dialog.FileName).Replace("X", "0").Replace("\r", "").Replace("\n", "");
+                FileContent = File.ReadAllText(dialog.FileName).Replace("X", "0").Replace("\r", "").Replace("\n", "").Replace(".", "0").Replace("|", "").Replace("-", "");
                 if (FileContent.Length != 81)
                 {
                     throw new InvalidDataException("Input data was not formatted correctly.");
@@ -214,18 +218,15 @@ namespace SudokuMaster4
             if (value > 0)
             {
                 label.Value = value;
-                label.Font = new Font("Consolas", 12);
-                label.BackColor = FixedBackColor;
-                label.ForeColor = FixedForeColor;
+                label.Font = new Font("Consolas", 14, FontStyle.Bold);
+                SudokuPuzzle.SetAlternateRegionColors(ref label);
                 label.Text = $@"{value}";
-                label.Enabled = false;
             }
             else if (value == 0)
             {
                 // set the appearance for the Label control 
                 label.Font = new Font("Consolas", 8);
-                label.BackColor = UserBackColor;
-                label.ForeColor = UserForeColor;
+                SudokuPuzzle.SetAlternateRegionColors(ref label);
                 label.MouseDown += SudokuLabel_MouseDown;
             }
         }
@@ -266,29 +267,24 @@ namespace SudokuMaster4
                 {
                     var label = (SudokuLabel)owner.SourceControl;
                     Trace.WriteLine(label.Name);
-                    label.Font = new Font("Consolas", 12);
+                    label.Font = new Font("Consolas", 14);
                     if (item.Text.Contains("Exclude")) label.Text = item.Text.Substring(7);
                     if (item.Text.Contains("Make")) label.Text = item.Text.Substring(5);
                     SelectedNumber = label.Value = int.Parse(label.Text);
 
-                    //todo: Create IsMoveValid function.
                     // check if move is valid
-                    if (!new SudokuPuzzle().IsMoveValid(label.Column, label.Row, label.Value))
+                    if (!SudokuPuzzle.IsMoveValid(label.Column, label.Row, label.SubGrid, label.Value))
                     {
-                        new SudokuPuzzle().DisplayActivity($"Invalid move at ({label.Column},{label.Row})", false);
+                        MessageBox.Show(@"Invalid move.");
                         return;
                     }
-
-                    //todo: Create IsPuzzleSolved function.
-                    if (new SudokuPuzzle().IsPuzzleSolved())
+                    DisplayCandidatesForAllCells();
+                    if (SudokuPuzzle.IsPuzzleSolved())
                     {
                         timer1.Enabled = false;
                         Console.Beep();
-                        toolStripStatusLabel1.Text = @"*****Puzzle Solved*****";
+                        toolStripStatusLabel1.Text = @"Great Job!";
                     }
-
-                    label.Enabled = false;
-                    DisplayCandidatesForAllCells();
                 }
             }
         }
@@ -387,7 +383,7 @@ namespace SudokuMaster4
 
                 if (dr == DialogResult.OK)
                 {
-                    new SudokuPuzzle().SaveGameToDisk(false);
+                    SudokuPuzzle.SaveGameToDisk(false);
                 }
                 else if (dr == DialogResult.Cancel)
                 {
@@ -406,29 +402,39 @@ namespace SudokuMaster4
 
         private void UndoToolStripMenuItem_Click(object sender, EventArgs e)
         {
-
+            if (Moves.Count != 0)
+            {
+                var str = Moves.Pop();
+                RedoMoves.Push(str);
+            }
         }
 
         private void RedoToolStripMenuItem_Click(object sender, EventArgs e)
         {
-
+            if (RedoMoves.Count != 0)
+            {
+                var str = RedoMoves.Pop();
+                Moves.Push(str);
+            }
         }
 
         private void SaveAsToolStripMenuItem_Click(object sender, EventArgs e)
         {
             if (!GameStarted)
             {
-                new SudokuPuzzle().DisplayActivity("Game not started yet.", true);
+                SudokuPuzzle.DisplayActivity("Game not started yet.", true);
                 return;
             }
 
-            new SudokuPuzzle().SaveGameToDisk(true);
+            SudokuPuzzle.SaveGameToDisk(true);
         }
 
-        private void CreatePuzzleToolStripMenuItem_Click(object sender, EventArgs e)
+        private void NewPuzzleToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            var form = new PuzzleCreator();
-            form.Show();
+            Hide();
+            var pm = new PuzzleMaker();
+            pm.Show();
         }
+
     }
 }

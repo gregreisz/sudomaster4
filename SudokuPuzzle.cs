@@ -1,72 +1,113 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace SudokuMaster4
 {
     public class SudokuPuzzle
     {
-        #region Class level variables
-
-
-        #endregion
-
-
 
         //==================================================
         // Check if move is valid
         //==================================================
-        public bool IsMoveValid(int col, int row, int value)
+        public static bool IsMoveValid(int col, int row, int region, int value)
         {
+            foreach (var label in Form1.sudokuLabels.Where(label => label.Column == col))
+            {
+                if (label.Value == value)
+                {
+                    Trace.WriteLine($"{col}{row}{region}{value}");
+                    return false;
+                }
+            }
+            foreach (var label in Form1.sudokuLabels.Where(label => label.Row == row))
+            {
+                if (label.Value == value)
+                {
+                    Trace.WriteLine($"{col}{row}{region}{value}");
+                    return false;
+                }
+            }
+            foreach (var label in Form1.sudokuLabels.Where(label => label.SubGrid == region))
+            {
+                if (label.Value == value)
+                {
+                    Trace.WriteLine($"{col}{row}{region}{value}");
+                    return false;
+                }
+            }
+
             return true;
         }
 
         //==================================================
         // Check if the puzzle is solved
         //==================================================
-        public bool IsPuzzleSolved()
+        public static bool IsPuzzleSolved()
         {
+            foreach (var label in Form1.sudokuLabels)
+            {
+                if (label.Value == 0)
+                {
+                    return false;
+                }
+            }
+
             return true;
+        }
+
+        public static void SetAlternateRegionColors(ref SudokuLabel label)
+        {
+            switch (label.SubGrid)
+            {
+                case 1:
+                case 3:
+                case 5:
+                case 7:
+                case 9:
+                    label.BackColor = Color.LightYellow;
+                    break;
+                case 2:
+                case 4:
+                case 6:
+                case 8:
+                    label.BackColor = Color.LightSteelBlue;
+                    break;
+            }
         }
 
 
         //==================================================
         // Displays a message in the Activities text box
         //==================================================
-        public void DisplayActivity(string str, bool soundBeep)
+        public static void DisplayActivity(string str, bool soundBeep)
         {
-            var form1 = new Form1();
             if (soundBeep) Console.Beep();
             if (string.IsNullOrEmpty(str)) return;
-            form1.TextBoxActivities.Text += str + Environment.NewLine;
+            new Form1().TextBoxActivities.Text += str + Environment.NewLine;
         }
 
         //==================================================
-        // Set the Tooltip for a Label control
-        //==================================================
-        public void SetToolTip(int col, int row, string possiblevalues)
-        {
-            // Locate the particular Label control 
-            var form1 = new Form1();
-            var lbl = form1.Controls.Find(col + row.ToString(), true);
-            form1.toolTip1.SetToolTip((Label)lbl[0], possiblevalues);
-        }
-        //==================================================
         // Save the game to disk
         //==================================================
-        public void SaveGameToDisk(bool saveAs)
+        public static void SaveGameToDisk(bool saveAs)
         {
-            var form1 = new Form1();
             // if saveFileName is empty, means game has not been saved before
-            if (form1.SaveFileName == string.Empty || saveAs)
+            if (Form1.SaveFileName == string.Empty || saveAs)
             {
                 var saveFileDialog1 = new SaveFileDialog
                 {
                     Filter = @"SDO files (*.sdo)|*.sdo|All files (*.*)|*.*",
                     FilterIndex = 1,
+                    InitialDirectory = Form1.InitialDirectory,
                     RestoreDirectory = false
                 };
                 if (saveFileDialog1.ShowDialog() == DialogResult.OK)
-                    form1.SaveFileName = saveFileDialog1.FileName;
+                {
+                    Form1.SaveFileName = saveFileDialog1.FileName;
+                }
             }
 
 
